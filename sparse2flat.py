@@ -80,7 +80,13 @@ def convert(sparse_path, desc_path):
         table = fin.read(2048)
         all_gt.extend(struct.unpack('<512I', table))
 
+    last_progress = 0
     for grain in range(0, capacity // grain_size):
+        progress = grain * grain_size * 100 // capacity
+        if progress != last_progress:
+            last_progress = progress
+            sys.stdout.write('\rProgress: {0}%'.format(progress))
+            sys.stdout.flush()
         gte = all_gt[grain]
         write_sectors(fin, fout, gte, grain_size, compressed)
 
@@ -89,7 +95,7 @@ def convert(sparse_path, desc_path):
         grain += 1
         gte = all_gt[grain]
         write_sectors(fin, fout, gte, remainder, compressed)
-
+    sys.stdout.write('\rDone.        \n')
     fin.close()
     fout.close()
 
