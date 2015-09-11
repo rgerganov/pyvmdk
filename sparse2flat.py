@@ -28,6 +28,24 @@ def save_descriptor(descriptor, desc_path, extent_path):
     fout.close()
 
 
+def write_sectors(fin, fout, gte, num_sectors, compressed):
+        if gte == 0 or gte == 1:
+            fout.write(num_sectors * 512 * '\x00')
+        else:
+            if compressed:
+                fin.seek(gte * 512)
+                marker = fin.read(12)
+                lba, size = struct.unpack('<QI', marker)
+                assert size > 0
+                data = fin.read(size)
+                raw_data = zlib.decompress(data)
+                fout.write(raw_data)
+            else:
+                fin.seek(gte * 512)
+                grain = fin.read(num_sectors * 512)
+                fout.write(grain)
+
+
 def convert(sparse_path, desc_path):
     fin = open(sparse_path, 'rb')
     data = fin.read(512)
@@ -64,41 +82,14 @@ def convert(sparse_path, desc_path):
 
     for grain in range(0, capacity // grain_size):
         gte = all_gt[grain]
-        if gte == 0 or gte == 1:
-            fout.write(grain_size * 512 * '\x00')
-        else:
-            if compressed:
-                fin.seek(gte * 512)
-                marker = fin.read(12)
-                lba, size = struct.unpack('<QI', marker)
-                assert size > 0
-                data = fin.read(size)
-                raw_data = zlib.decompress(data)
-                fout.write(raw_data)
-            else:
-                fin.seek(gte * 512)
-                grain = fin.read(grain_size * 512)
-                fout.write(grain)
+        write_sectors(fin, fout, gte, grain_size, compressed)
 
     remainder = capacity % grain_size
     if remainder > 0:
         grain += 1
         gte = all_gt[grain]
-        if gte == 0 or gte == 1:
-            fout.write(remainder * 512 * '\x00')
-        else:
-            if compressed:
-                fin.seek(gte * 512)
-                marker = fin.read(12)
-                lba, size = struct.unpack('<QI', marker)
-                assert size > 0
-                data = fin.read(size)
-                raw_data = zlib.decompress(data)
-                fout.write(raw_data)
-            else:
-                fin.seek(gte * 512)
-                grain = fin.read(remainder * 512)
-                fout.write(grain)
+        write_sectors(fin, fout, gte, remainder, compressed)
+
     fin.close()
     fout.close()
 
